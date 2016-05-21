@@ -68,6 +68,23 @@ describe('Cache', function() {
         });
     });
 
+    it('cache old files', function() {
+        const cache = new Cache();
+        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+            assert(reqOpts);
+            return mockResponseWith({
+                'date': 'Sat, 21 May 2016 13:54:34 GMT',
+                'last-modified': 'Mon, 07 Mar 2016 11:52:56 GMT',
+            });
+        }).then(() => {
+            return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+                assert.fail("should cache");
+            });
+        }).then(res => {
+            assert.equal(res.headers['last-modified'], 'Mon, 07 Mar 2016 11:52:56 GMT');
+        });
+    });
+
     it('cache error', function() {
         const cache = new Cache();
         return cache.getCached('http://foo.bar/baz.quz', {}, () => {

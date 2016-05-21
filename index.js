@@ -95,6 +95,15 @@ Cache.prototype = {
         if (expiresTime && expiresTime > serverTime) {
             return expiresTime - serverTime;
         }
+
+        if (res.headers['last-modified']) {
+            const lastModified = Date.parse(res.headers['last-modified']);
+            const age = serverTime - lastModified;
+            if (age > 0) {
+                return age * 0.01; // In absence of other information cache for 1% of item's age
+            }
+        }
+
         return 0;
     },
 }
