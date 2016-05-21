@@ -46,6 +46,11 @@ Cache.prototype = {
             return 0;
         }
 
+        const cc = res.headers['cache-control'];
+        if (/private|no-cache|no-store|must-revalidate|proxy-revalidate/.test(cc)) {
+            return 0;
+        }
+
         if (res.headers['vary']) {
             const tokens = res.headers['vary'].split(/[\s,]+/).filter(t => !/^(?:accept-charset|accept-encoding|host|accept|origin)$/i.test(t));
             if (tokens.length) {
@@ -68,9 +73,7 @@ Cache.prototype = {
             }
         }
 
-        const cc = res.headers['cache-control'];
         if (cc) {
-            if (/private|no-cache|no-store|must-revalidate|proxy-revalidate/.test(cc)) return 0;
             const m = cc.match(/s-maxage=([0-9]+)/);
             if (m) {
                 return m[1]*1000;
