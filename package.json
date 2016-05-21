@@ -1,0 +1,18 @@
+{
+  "name": "read-through-http-cache",
+  "version": "1.0.0",
+  "description": "Read-through LRU cache that has basic understanding of HTTP cache headers",
+  "main": "index.js",
+  "repository": "https://github.com/pornel/read-through-http-cache.git",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "Kornel Lesiński <kornel@geekhood.net> (https://kornel.ski/)",
+  "license": "BSD-2-Clause",
+  "devDependencies": {
+    "mocha": "^2.4.5"
+  },
+  "dependencies": {
+    "lru-cache": "^4.0.1"
+  }
+}
