@@ -53,6 +53,21 @@ describe('Cache', function() {
         });
     });
 
+    it('cache with expires', function() {
+        const cache = new Cache();
+        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+            assert(reqOpts);
+            return mockResponseWith({
+                'date': new Date().toGMTString(),
+                'expires': new Date(Date.now() + 2000),
+            });
+        }).then(() => {
+            return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+                assert.fail("should cache");
+            });
+        });
+    });
+
     it('cache error', function() {
         const cache = new Cache();
         return cache.getCached('http://foo.bar/baz.quz', {}, () => {

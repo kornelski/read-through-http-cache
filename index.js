@@ -62,18 +62,22 @@ Cache.prototype = {
             }
         }
 
+        let serverTime = Date.parse(res.headers['date'])
+        const now = Date.now();
+        const maxClockDrift = 8*3600*1000;
+        if (!isFinite(serverTime) || serverTime < now-maxClockDrift || serverTime > now+maxClockDrift) {
+            serverTime = now;
+        }
+
+        // If max-age and Expires disagree, pick one that disables caching
+        let expiresTime;
         if (res.headers['expires']) {
             const expires = Date.parse(res.headers['expires']);
             if (isFinite(expires)) {
-                let serverTime = Date.parse(res.headers['date'])
-                const now = Date.now();
-                const maxClockDrift = 8*3600*1000;
-                if (!isFinite(serverTime) || serverTime < now-maxClockDrift || serverTime > now+maxClockDrift) {
-                    serverTime = now;
-                }
                 if (expires < serverTime) {
                     return 0;
                 }
+                expiresTime = expires;
             }
         }
 
@@ -86,6 +90,10 @@ Cache.prototype = {
             if (n) {
                 return n[1]*1000;
             }
+        }
+
+        if (expiresTime && expiresTime > serverTime) {
+            return expiresTime - serverTime;
         }
         return 0;
     },
