@@ -47,7 +47,7 @@ Cache.prototype = {
         }
 
         const cc = res.headers['cache-control'];
-        if (/private|no-cache|no-store|must-revalidate|proxy-revalidate/.test(cc)) {
+        if (/private|no-cache|no-store/.test(cc)) {
             return 0;
         }
 
