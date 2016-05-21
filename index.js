@@ -51,6 +51,10 @@ Cache.prototype = {
             return 0;
         }
 
+        if (!/public/.test(cc) && res.headers['set-cookie']) {
+            return 0;
+        }
+
         if (res.headers['vary']) {
             const tokens = res.headers['vary'].split(/[\s,]+/).filter(t => !/^(?:accept-charset|accept-encoding|host|accept|origin)$/i.test(t));
             if (tokens.length) {

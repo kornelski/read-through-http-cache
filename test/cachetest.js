@@ -124,6 +124,51 @@ describe('Cache', function() {
         });
     });
 
+    it('miss cookie', function() {
+        const cache = new Cache();
+        let called = 0;
+        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+            assert(reqOpts);
+            called++;
+            return mockResponseWith({
+                'set-cookie': 'foo=bar',
+                'cache-control': 'max-age=99',
+            });
+        }).then(() => {
+            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+                called++;
+                return mockResponseWith({
+                    'second': 'yes',
+                });
+            });
+        }).then(res => {
+            assert(res.testedObject);
+            assert.equal(2, called);
+            assert.equal(res.headers.second, 'yes');
+        });
+    });
+
+    it('cache public cookie', function() {
+        const cache = new Cache();
+        let called = 0;
+        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+            assert(reqOpts);
+            called++;
+            return mockResponseWith({
+                'set-cookie': 'foo=bar',
+                'cache-control': 'public, max-age=99',
+            });
+        }).then(res => {
+            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+                assert.fail("should cache")
+            });
+        }).then(res => {
+            assert(res.testedObject);
+            assert.equal(1, called);
+            assert.equal(res.headers['set-cookie'], 'foo=bar');
+        });
+    });
+
     it('miss max-age=0', function() {
         const cache = new Cache();
         let called = 0;
