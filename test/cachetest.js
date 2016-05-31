@@ -3,6 +3,10 @@
 const assert = require('assert');
 const Cache = require('..');
 
+const req = {
+    headers: {},
+}
+
 function mockResponseWith(headers) {
     return {
         testedObject:true,
@@ -15,7 +19,7 @@ describe('Cache', function() {
     it('simple miss', function() {
         const cache = new Cache();
         let called = false;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called = true;
             return mockResponseWith({});
@@ -29,7 +33,7 @@ describe('Cache', function() {
     it('simple hit', function() {
         const cache = new Cache();
         let missInParallelCalled = false;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'cache-control': 'public, max-age=999999',
@@ -38,8 +42,8 @@ describe('Cache', function() {
         }).then(res => {
             assert(res.testedObject);
             return Promise.all([
-                cache.getCached('http://foo.bar/baz.quz', {}, opt => assert.fail("should cache", opt)),
-                cache.getCached('https://foo.bar/baz.quz', {}, reqOpts => {
+                cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt)),
+                cache.getCached('https://foo.bar/baz.quz', req, reqOpts => {
                     assert(reqOpts);
                     missInParallelCalled = true;
                     return mockResponseWith({});
@@ -55,14 +59,14 @@ describe('Cache', function() {
 
     it('cache with expires', function() {
         const cache = new Cache();
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'date': new Date().toGMTString(),
                 'expires': new Date(Date.now() + 2000),
             });
         }).then(() => {
-            return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+            return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
                 assert.fail("should cache");
             });
         });
@@ -70,14 +74,14 @@ describe('Cache', function() {
 
     it('cache old files', function() {
         const cache = new Cache();
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'date': 'Sat, 21 May 2016 13:54:34 GMT',
                 'last-modified': 'Mon, 07 Mar 2016 11:52:56 GMT',
             });
         }).then(() => {
-            return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+            return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
                 assert.fail("should cache");
             });
         }).then(res => {
@@ -87,11 +91,11 @@ describe('Cache', function() {
 
     it('cache error', function() {
         const cache = new Cache();
-        return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+        return cache.getCached('http://foo.bar/baz.quz', req, () => {
             throw Error("test");
         }).then(res => assert.fail("nope", res), err => {
             assert.equal("test", err.message);
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz', req, () => {
                 assert.fail("don't call");
             });
         }).then(res => assert.fail("nope", res), err => {
@@ -101,13 +105,13 @@ describe('Cache', function() {
 
     it('cache error expires', function() {
         const cache = new Cache({errorTimeout: 5});
-        return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+        return cache.getCached('http://foo.bar/baz.quz', req, () => {
             throw Error("test");
         }).then(res => assert.fail("nope", res), err => {
             assert.equal("test", err.message);
             return new Promise(res => setTimeout(res, 6));
         }).then(() => {
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz', req, () => {
                 return mockResponseWith({'expir':'ed'});
             });
         }).then(res => {
@@ -117,12 +121,12 @@ describe('Cache', function() {
 
     it('cache error per url', function() {
         const cache = new Cache();
-        return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+        return cache.getCached('http://foo.bar/baz.quz', req, () => {
             throw Error("test");
         }).then(res => assert.fail("nope", res), err => {
             assert.equal("test", err.message);
         }).then(() => {
-            return cache.getCached('http://foo.bar/baz.quz?', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz?', req, () => {
                 return mockResponseWith({'got':'it'});
             });
         }).then(res => {
@@ -134,7 +138,7 @@ describe('Cache', function() {
     it('miss private cache', function() {
         const cache = new Cache();
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called++;
             return mockResponseWith({
@@ -142,7 +146,7 @@ describe('Cache', function() {
             });
         }).then(res => {
             assert(res.testedObject);
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz', req, () => {
                 called++;
                 return mockResponseWith({
                     'cache-control': 'private, max-age=333',
@@ -159,7 +163,7 @@ describe('Cache', function() {
     it('miss cookie', function() {
         const cache = new Cache();
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called++;
             return mockResponseWith({
@@ -167,7 +171,7 @@ describe('Cache', function() {
                 'cache-control': 'max-age=99',
             });
         }).then(() => {
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz', req, () => {
                 called++;
                 return mockResponseWith({
                     'second': 'yes',
@@ -183,7 +187,7 @@ describe('Cache', function() {
     it('cache public cookie', function() {
         const cache = new Cache();
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called++;
             return mockResponseWith({
@@ -191,7 +195,7 @@ describe('Cache', function() {
                 'cache-control': 'public, max-age=99',
             });
         }).then(res => {
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz', req, () => {
                 assert.fail("should cache")
             });
         }).then(res => {
@@ -204,7 +208,7 @@ describe('Cache', function() {
     it('miss max-age=0', function() {
         const cache = new Cache();
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
+        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called++;
             return mockResponseWith({
@@ -212,7 +216,7 @@ describe('Cache', function() {
             });
         }).then(res => {
             assert(res.testedObject);
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
+            return cache.getCached('http://foo.bar/baz.quz', req, () => {
                 called++;
                 return mockResponseWith({
                     'cache-control': 'public, max-age=333',

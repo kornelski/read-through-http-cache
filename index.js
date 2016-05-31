@@ -24,22 +24,26 @@ Cache.prototype = {
 
         const cached = this._storage.get(url);
         if (cached) {
-            return cached.promise.then(res => {
-                res.headers['im2-cache'] = 'hit'; // res is shared mutable, so that is race-y
-                return res;
-            });
+            if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
+                return cached.promise.then(res => {
+                    if (cached.policy) {
+                        res.headers = cached.policy.responseHeaders();
+                        res.headers['im2-cache'] = 'hit';
+                    }
+                    return res;
+                });
+            }
         }
 
         const resultPromise = Promise.resolve({}).then(callback);
         return resultPromise.then(res => {
             if (res && res.headers) {
                 const policy = new CachePolicy(request, res, {shared:true});
-                const maxAge = policy.maxAge(res);
-                if (maxAge) {
+                const timeToLive = policy.timeToLive(res);
+                if (timeToLive) {
                     res.headers['im2-cache'] = 'miss';
-                    res.headers['expires'] = new Date(Date.now() + maxAge*1000).toGMTString();
                     const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
-                    this._storage.set(url, {cost, promise:resultPromise}, maxAge*1000);
+                    this._storage.set(url, {cost, policy, promise:resultPromise}, timeToLive);
                 } else {
                     res.headers['im2-cache'] = 'no-cache';
                 }
