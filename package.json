@@ -13,6 +13,7 @@
     "mocha": "^2.4.5"
   },
   "dependencies": {
+    "http-cache-semantics": "^1.0.0",
     "lru-cache": "^4.0.1"
   }
 }

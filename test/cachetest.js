@@ -225,31 +225,4 @@ describe('Cache', function() {
             assert.equal(res.headers.second, 'yes');
         });
     });
-
-    it('miss expires', function() {
-        const cache = new Cache();
-        let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', {}, reqOpts => {
-            assert(reqOpts);
-            called++;
-            return mockResponseWith({
-                'cache-control': 'public, max-age=9999',
-                'expires': 'Sat, 07 May 2016 15:35:18 GMT',
-            });
-        }).then(res => {
-            assert(res.testedObject);
-            return cache.getCached('http://foo.bar/baz.quz', {}, () => {
-                called++;
-                return mockResponseWith({
-                    'cache-control': 'public, max-age=333',
-                    'expires': new Date(Date.now()+3600*1000).toGMTString(),
-                    'second': 'yes',
-                });
-            });
-        }).then(res => {
-            assert(res.testedObject);
-            assert.equal(2, called);
-            assert.equal(res.headers.second, 'yes');
-        });
-    });
 });
