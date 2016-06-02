@@ -8,7 +8,7 @@ function Cache(options) {
 
     this._errorTimeout = options.errorTimeout || 200;
 
-    this._storage = new LRU({
+    this._storage = options.storage || new LRU({
         max: options.size || 500*1024*1024, // 500MB
         length(obj) {
             return obj.cost;
