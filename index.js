@@ -6,6 +6,7 @@ const CachePolicy = require('http-cache-semantics');
 function Cache(options) {
     if (!options) options = {};
 
+    this._busyTimeout = options.busyTimeout || 2000;
     this._errorTimeout = options.errorTimeout || 200;
 
     this._storage = options.storage || new LRU({
@@ -24,6 +25,11 @@ Cache.prototype = {
 
         const cached = this._storage.get(url);
         if (cached) {
+            if (cached.temp) {
+                return cached.promise.then(() => {
+                    return this.getCached(url, request, callback);
+                });
+            }
             if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
                 return cached.promise.then(res => {
                     if (cached.policy) {
@@ -36,7 +42,8 @@ Cache.prototype = {
         }
 
         const resultPromise = Promise.resolve({}).then(callback);
-        return resultPromise.then(res => {
+
+        const workInProgressPromise = resultPromise.then(res => {
             if (res && res.headers) {
                 const policy = new CachePolicy(request, res, {shared:true});
                 const timeToLive = policy.timeToLive(res);
@@ -45,14 +52,21 @@ Cache.prototype = {
                     const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
                     this._storage.set(url, {cost, policy, promise:resultPromise}, timeToLive);
                 } else {
+                    this._storage.del(url);
                     res.headers['im2-cache'] = 'no-cache';
                 }
+            } else {
+                this._storage.del(url);
             }
             return res;
         }, err => {
             this._storage.set(url, {cost: 30000, promise:resultPromise}, this._errorTimeout);
             throw err;
         });
+
+        // thundering herd protection
+        this._storage.set(url, {cost:1, temp:true, promise: workInProgressPromise}, this._busyTimeout);
+        return workInProgressPromise;
     },
 }
 
