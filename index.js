@@ -22,37 +22,36 @@ Cache.prototype = {
     getCached(url, request, callback) {
         if (!url || !request || !callback) throw Error("Bad cache args");
 
-        return Promise.resolve(this._storage.get(url)).then(cached => {
-            if (cached) {
-                if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
-                    return cached.promise.then(res => {
-                        if (cached.policy) {
-                            res.headers = cached.policy.responseHeaders();
-                            res.headers['im2-cache'] = 'hit';
-                        }
-                        return res;
-                    });
+        const cached = this._storage.get(url);
+        if (cached) {
+            if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
+                return cached.promise.then(res => {
+                    if (cached.policy) {
+                        res.headers = cached.policy.responseHeaders();
+                        res.headers['im2-cache'] = 'hit';
+                    }
+                    return res;
+                });
+            }
+        }
+
+        const resultPromise = Promise.resolve({}).then(callback);
+        return resultPromise.then(res => {
+            if (res && res.headers) {
+                const policy = new CachePolicy(request, res, {shared:true});
+                const timeToLive = policy.timeToLive(res);
+                if (timeToLive) {
+                    res.headers['im2-cache'] = 'miss';
+                    const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
+                    this._storage.set(url, {cost, policy, promise:resultPromise}, timeToLive);
+                } else {
+                    res.headers['im2-cache'] = 'no-cache';
                 }
             }
-
-            const resultPromise = Promise.resolve({}).then(callback);
-            return resultPromise.then(res => {
-                if (res && res.headers) {
-                    const policy = new CachePolicy(request, res, {shared:true});
-                    const timeToLive = policy.timeToLive(res);
-                    if (timeToLive) {
-                        res.headers['im2-cache'] = 'miss';
-                        const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
-                        this._storage.set(url, {cost, policy, promise:resultPromise}, timeToLive);
-                    } else {
-                        res.headers['im2-cache'] = 'no-cache';
-                    }
-                }
-                return res;
-            }, err => {
-                this._storage.set(url, {cost: 30000, promise:resultPromise}, this._errorTimeout);
-                throw err;
-            });
+            return res;
+        }, err => {
+            this._storage.set(url, {cost: 30000, promise:resultPromise}, this._errorTimeout);
+            throw err;
         });
     },
 }
