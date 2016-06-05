@@ -148,6 +148,23 @@ describe('Cold cache', function() {
         });
     });
 
+    it('hit with cold cache via dispose', function() {
+        const cache = new Cache({coldStorage});
+        return cache.getCached('http://example.com/dispose', req, () => {
+            return mockResponseWith({
+                'cache-control': 'public, max-age=444',
+                'try': 'disposed',
+            });
+        })
+        .then(() => cache._storage.reset())
+        .then(() => cache.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt)))
+        .then(res => {
+            assert(res.testedObject);
+            assert.equal(res.headers.try, 'disposed');
+            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=444","try":"disposed"}');
+        });
+    });
+
     it('miss with cold cache', function() {
         const cache = new Cache({coldStorage});
         let missInParallelCalled = false;
