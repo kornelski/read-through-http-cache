@@ -17,6 +17,8 @@ function Cache(options) {
         stale:false, // errors must expire
         maxAge: options.maxAge || 24*3600*1000,
     });
+
+    this._coldStorage = options.coldStorage;
 }
 
 Cache.prototype = {
@@ -33,6 +35,14 @@ Cache.prototype = {
             if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
                 return cached.promise.then(res => {
                     if (cached.policy) {
+                        if (!cached.inColdStoarge && this._coldStorage) {
+                            cached.inColdStoarge = true;
+                            this._coldStorage.set(url, res, cached.policy.timeToLive()).catch(err => {
+                                console.error(err);
+                                cached.inColdStoarge = false;
+                            });
+                        }
+
                         res.headers = cached.policy.responseHeaders();
                         res.headers['im2-cache'] = 'hit';
                     }
@@ -41,7 +51,17 @@ Cache.prototype = {
             }
         }
 
-        const resultPromise = Promise.resolve({}).then(callback);
+        let resultPromise;
+        if (this._coldStorage) {
+            resultPromise = this._coldStorage.get(url).catch(err => {
+                    console.error(err);
+                }).then(res => {
+                    if (res) return res;
+                    return callback({});
+                });
+        } else {
+            resultPromise = Promise.resolve({}).then(callback);
+        }
 
         const workInProgressPromise = resultPromise.then(res => {
             if (res && res.headers) {
