@@ -95,7 +95,7 @@ describe('Cold cache', function() {
                 'old': 'yes',
             })
         }).then(res => {
-            cache._storage.reset();
+            cache.purge();
             assert(res.testedObject);
             return Promise.all([
                 cache.getCached('http://foo.bar/baz.quz', req, () => {
@@ -129,7 +129,7 @@ describe('Cold cache', function() {
         })
         .then(() => cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt)))
         .then(res => {
-            cache._storage.reset();
+            cache.purge();
             assert(res.testedObject);
             return Promise.all([
                 cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt)),
@@ -169,6 +169,26 @@ describe('Cold cache', function() {
         });
     });
 
+    it('hit with cold cache via dump', function() {
+        const cache = new Cache({coldStorage});
+        return cache.getCached('http://example.com/dispose', req, () => {
+            return mockResponseWith({
+                'cache-control': 'public, max-age=444',
+                'try': 'disposed',
+            });
+        })
+        .then(() => cache.dump())
+        .then(() => {
+            const cache2 = new Cache({coldStorage});
+            return cache2.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt));
+        })
+        .then(res => {
+            assert(res.testedObject);
+            assert.equal(res.headers.try, 'disposed');
+            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=444","try":"disposed"}');
+        });
+    });
+
     it('hit with cold cache via dispose', function() {
         const cache = new Cache({coldStorage});
         return cache.getCached('http://example.com/dispose', req, () => {
@@ -177,7 +197,7 @@ describe('Cold cache', function() {
                 'try': 'disposed',
             });
         })
-        .then(() => cache._storage.reset())
+        .then(() => cache.purge())
         .then(() => cache.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt)))
         .then(res => {
             assert(res.testedObject);
@@ -201,7 +221,7 @@ describe('Cold cache', function() {
             'try': 'second',
         })))
         .then(res => {
-            cache._storage.reset();
+            cache.purge();
             assert(res.testedObject);
             return Promise.all([
                 cache.getCached('http://foo.bar/baz.quz', req, () => mockResponseWith({

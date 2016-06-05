@@ -103,6 +103,22 @@ Cache.prototype = {
             });
         }
     },
+
+    dump() {
+        const arr = [];
+        this._storage.forEach((cached, url) => {
+            if (cached && !cached.temp && cached.policy) {
+                arr.push(cached.promise.then(res => {
+                    return this._putInColdStorage(url, res, cached);
+                }));
+            }
+        });
+        return Promise.all(arr)
+    },
+
+    purge() {
+        this._storage.reset();
+    },
 }
 
 module.exports = Cache;
