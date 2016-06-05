@@ -57,7 +57,10 @@ Cache.prototype = {
             resultPromise = this._coldStorage.get(url).catch(err => {
                     console.error(err);
                 }).then(res => {
-                    if (res) return res;
+                    if (res) {
+                        res.wasInColdStorageHack = true;
+                        return res;
+                    }
                     return callback({});
                 });
         } else {
@@ -66,12 +69,13 @@ Cache.prototype = {
 
         const workInProgressPromise = resultPromise.then(res => {
             if (res && res.headers) {
+                const inColdStoarge = res.wasInColdStorageHack;
                 const policy = new CachePolicy(request, res, {shared:true});
                 const timeToLive = policy.timeToLive(res);
                 if (timeToLive) {
-                    res.headers['im2-cache'] = 'miss';
+                    res.headers['im2-cache'] = inColdStoarge ? 'cold' : 'miss';
                     const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
-                    this._storage.set(url, {cost, policy, promise:resultPromise}, timeToLive);
+                    this._storage.set(url, {cost, inColdStoarge, policy, promise:resultPromise}, timeToLive);
                 } else {
                     this._storage.del(url);
                     res.headers['im2-cache'] = 'no-cache';
