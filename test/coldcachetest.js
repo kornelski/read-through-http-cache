@@ -148,6 +148,27 @@ describe('Cold cache', function() {
         });
     });
 
+    it('hit with new cache', function() {
+        const cache1 = new Cache({coldStorage});
+        return Promise.all([
+            cache1.getCached('http://test.local/long', req, () => {
+                return mockResponseWith({
+                    'cache-control': 'public, max-age=6666',
+                    'cached': 'yeah',
+                });
+            }),
+            cache1.getCached('http://test.local/long', req, opt => assert.fail("should cache", opt)),
+        ])
+        .then(() => {
+            const cache2 = new Cache({coldStorage});
+            return cache2.getCached('http://test.local/long', req, opt => assert.fail("should cache", opt));
+        }).then(res => {
+            assert(res.testedObject);
+            assert.equal(res.headers.cached, 'yeah');
+            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=6666","cached":"yeah"}');
+        });
+    });
+
     it('hit with cold cache via dispose', function() {
         const cache = new Cache({coldStorage});
         return cache.getCached('http://example.com/dispose', req, () => {
