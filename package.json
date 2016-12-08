@@ -1,6 +1,6 @@
 {
   "name": "read-through-http-cache",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "description": "Read-through LRU cache that has basic understanding of HTTP cache headers",
   "main": "index.js",
   "repository": "https://github.com/pornel/read-through-http-cache.git",
@@ -13,7 +13,7 @@
     "mocha": "^2.4.5"
   },
   "dependencies": {
-    "http-cache-semantics": "^3.2.0",
+    "http-cache-semantics": "^3.3.0",
     "lru-cache": "^4.0.1"
   }
 }
