@@ -70,7 +70,7 @@ Cache.prototype = {
         const workInProgressPromise = resultPromise.then(res => {
             if (res && res.headers) {
                 const inColdStoarge = res.wasInColdStorageHack;
-                const policy = new CachePolicy(request, res, {shared:true});
+                const policy = new CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
                 const timeToLive = policy.timeToLive(res);
                 if (timeToLive) {
                     res.headers['im2-cache'] = inColdStoarge ? 'cold' : 'miss';
