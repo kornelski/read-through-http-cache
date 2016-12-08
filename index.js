@@ -29,14 +29,14 @@ function Cache(options) {
 }
 
 Cache.prototype = {
-    getCached(url, request, callback) {
-        if (!url || !request || !callback) throw Error("Bad cache args");
+    getCached(url, request, onCacheMissCallback) {
+        if (!url || !request || !onCacheMissCallback) throw Error("Bad cache args");
 
         const cached = this._storage.get(url);
         if (cached) {
             if (cached.temp) {
                 return cached.promise.then(() => {
-                    return this.getCached(url, request, callback);
+                    return this.getCached(url, request, onCacheMissCallback);
                 });
             }
             if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
@@ -61,10 +61,10 @@ Cache.prototype = {
                         res.wasInColdStorageHack = true;
                         return res;
                     }
-                    return callback({});
+                    return onCacheMissCallback({});
                 });
         } else {
-            resultPromise = Promise.resolve({}).then(callback);
+            resultPromise = Promise.resolve({}).then(onCacheMissCallback);
         }
 
         const workInProgressPromise = resultPromise.then(res => {
