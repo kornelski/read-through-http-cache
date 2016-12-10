@@ -46,6 +46,7 @@ Cache.prototype = {
 
                         res.headers = cached.policy.responseHeaders();
                         res.headers['im2-cache'] = 'hit';
+                        res.ttl = cached.policy.timeToLive();
                     }
                     return res;
                 });
