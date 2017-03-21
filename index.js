@@ -32,6 +32,7 @@ module.exports = class Cache {
         if (!url || !request || !onCacheMissCallback) throw Error("Bad cache args");
 
         const cached = this._storage.get(url);
+        let revalidationHeaders = {};
 
         if (cached) {
             if (cached.temp) {
@@ -49,6 +50,9 @@ module.exports = class Cache {
                 }
                 return res;
             }
+            if (cached.policy) {
+                revalidationHeaders = cached.policy.revalidationHeaders(request);
+            }
         }
 
         let resultPromise;
@@ -60,10 +64,10 @@ module.exports = class Cache {
                         res.wasInColdStorageHack = true;
                         return res;
                     }
-                    return onCacheMissCallback({});
+                    return onCacheMissCallback(revalidationHeaders);
                 });
         } else {
-            resultPromise = Promise.resolve({}).then(onCacheMissCallback);
+            resultPromise = Promise.resolve(revalidationHeaders).then(onCacheMissCallback);
         }
 
         const workInProgressPromise = resultPromise.then(res => {
