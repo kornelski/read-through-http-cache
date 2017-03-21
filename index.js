@@ -24,6 +24,7 @@ module.exports = class Cache {
             maxAge: options.maxAge || 24*3600*1000,
         });
 
+        this._CachePolicy = options.CachePolicy || CachePolicy;
         this._coldStorage = options.coldStorage;
     }
 
@@ -69,7 +70,7 @@ module.exports = class Cache {
         const workInProgressPromise = resultPromise.then(res => {
             if (res && res.headers) {
                 const inColdStoarge = res.wasInColdStorageHack;
-                const policy = new CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
+                const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
                 const timeToLive = policy.timeToLive(res);
                 if (timeToLive) {
                     res.headers['im2-cache'] = inColdStoarge ? 'cold' : 'miss';
