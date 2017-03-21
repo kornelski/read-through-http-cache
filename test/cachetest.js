@@ -63,7 +63,7 @@ describe('Cache', function() {
             assert(reqOpts);
             return mockResponseWith({
                 'date': new Date().toGMTString(),
-                'expires': new Date(Date.now() + 2000),
+                'expires': new Date(Date.now() + 2000).toGMTString(),
             });
         }).then(() => {
             return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
