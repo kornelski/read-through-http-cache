@@ -28,27 +28,26 @@ module.exports = class Cache {
         this._coldStorage = options.coldStorage;
     }
 
-    getCached(url, request, onCacheMissCallback) {
+    async getCached(url, request, onCacheMissCallback) {
         if (!url || !request || !onCacheMissCallback) throw Error("Bad cache args");
 
         const cached = this._storage.get(url);
+
         if (cached) {
             if (cached.temp) {
-                return cached.promise.then(() => {
-                    return this.getCached(url, request, onCacheMissCallback);
-                });
+                await cached.promise;
+                return this.getCached(url, request, onCacheMissCallback);
             }
             if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
-                return cached.promise.then(res => {
-                    if (cached.policy) {
-                        this._putInColdStorage(url, res, cached);
+                const res = await cached.promise;
+                if (cached.policy) {
+                    this._putInColdStorage(url, res, cached);
 
-                        res.headers = cached.policy.responseHeaders();
-                        res.headers['im2-cache'] = 'hit';
-                        res.ttl = cached.policy.timeToLive();
-                    }
-                    return res;
-                });
+                    res.headers = cached.policy.responseHeaders();
+                    res.headers['im2-cache'] = 'hit';
+                    res.ttl = cached.policy.timeToLive();
+                }
+                return res;
             }
         }
 
