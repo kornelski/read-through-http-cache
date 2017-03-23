@@ -32,7 +32,6 @@ module.exports = class Cache {
         if (!url || !request || !onCacheMissCallback) throw Error("Bad cache args");
 
         const cached = this._storage.get(url);
-        let revalidationHeaders = {};
 
         if (cached) {
             if (cached.temp) {
@@ -50,51 +49,68 @@ module.exports = class Cache {
                 }
                 return res;
             }
-            if (cached.policy) {
-                revalidationHeaders = cached.policy.revalidationHeaders(request);
-            }
         }
 
-        let resultPromise;
-        if (this._coldStorage) {
-            resultPromise = this._coldStorage.get(url).catch(err => {
-                    console.error(err);
-                }).then(res => {
-                    if (res) {
-                        res.wasInColdStorageHack = true;
-                        return res;
-                    }
-                    return onCacheMissCallback(revalidationHeaders);
-                });
-        } else {
-            resultPromise = Promise.resolve(revalidationHeaders).then(onCacheMissCallback);
-        }
-
-        const workInProgressPromise = resultPromise.then(res => {
-            if (res && res.headers) {
-                const inColdStoarge = res.wasInColdStorageHack;
-                const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
-                const timeToLive = policy.timeToLive(res);
+        const resultPromise = this._getResult(url, request, cached, onCacheMissCallback)
+        .then(({res, policy, inColdStoarge}) => {
+            if (policy && res && res.headers) {
+                res.headers = policy.responseHeaders(); // Headers must always be sanitized
+                const timeToLive = policy.timeToLive();
                 if (timeToLive) {
                     res.headers['im2-cache'] = inColdStoarge ? 'cold' : 'miss';
                     const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
-                    this._storage.set(url, {cost, inColdStoarge, policy, promise:resultPromise}, timeToLive);
+                    this._storage.set(url, {cost, inColdStoarge, policy, promise:resultPromise}, timeToLive + Math.random()*2000); // Rand time to ease simultaneous cache misses
                 } else {
                     this._storage.del(url);
                     res.headers['im2-cache'] = 'no-cache';
                 }
+                return res;
             } else {
                 this._storage.del(url);
+                throw Error(`Empty result: ${url}`);
             }
-            return res;
-        }, err => {
-            this._storage.set(url, {cost: 30000, promise:resultPromise}, this._errorTimeout);
+        }).catch(err => {
+            // Self-referential awkwardness to avoid having a copy of the promise with uncaught error
+            this._storage.set(url, {cost: 30000, isError:true, promise:resultPromise}, this._errorTimeout);
             throw err;
         });
 
         // thundering herd protection
-        this._storage.set(url, {cost:1, temp:true, promise: workInProgressPromise}, this._busyTimeout);
-        return workInProgressPromise;
+        this._storage.set(url, {cost:1, temp:true, promise:resultPromise}, this._busyTimeout);
+        return resultPromise;
+    }
+
+    async _getResult(url, request, cached, onCacheMissCallback) {
+        if (this._coldStorage) {
+            const res = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
+            if (res) {
+                // FIXME: it should read cachePolicy as well!
+                const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
+                return {res, policy, inColdStoarge: true};
+            }
+        }
+
+        if (cached && cached.policy && !cached.isError) {
+            const headers = cached.policy.revalidationHeaders(request);
+            let res = await onCacheMissCallback(headers);
+
+            const {policy, modified} = cached.policy.revalidatedPolicy({headers}, res);
+            cached.policy = policy; // That's a bit hacky faster update, taking advantage of a shared mutable obj
+            if (!modified) {
+                res = await cached.promise;
+            } else if (res.status === 304) {
+                res = await onCacheMissCallback({});
+            }
+            return {res, policy};
+        }
+
+        const res = await onCacheMissCallback({});
+        if (res.status === 304) {
+            throw Error("Unexpected revalidation");
+        }
+        const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
+
+        return {res, policy};
     }
 
     _putInColdStorage(url, res, cached) {
