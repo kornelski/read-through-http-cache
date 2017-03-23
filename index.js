@@ -99,11 +99,14 @@ module.exports = class Cache {
 
     _putInColdStorage(url, res, cached) {
         if (!cached.inColdStoarge && this._coldStorage) {
-            cached.inColdStoarge = true;
-            this._coldStorage.set(url, res, cached.policy.timeToLive()).catch(err => {
-                console.error(err);
-                cached.inColdStoarge = false;
-            });
+            const ttl = cached.policy.timeToLive();
+            if (ttl >= 3600*1000) { // don't bother if < 1h min time
+                cached.inColdStoarge = true;
+                this._coldStorage.set(url, res, ttl).catch(err => {
+                    console.error(err);
+                    cached.inColdStoarge = false;
+                });
+            }
         }
     }
 

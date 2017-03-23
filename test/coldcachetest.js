@@ -173,7 +173,7 @@ describe('Cold cache', function() {
         const cache = new Cache({coldStorage});
         await cache.getCached('http://example.com/dispose', req, () => {
             return mockResponseWith({
-                'cache-control': 'public, max-age=444',
+                'cache-control': 'public, max-age=22444',
                 'try': 'disposed',
             });
         });
@@ -183,14 +183,14 @@ describe('Cold cache', function() {
         const res = await cache2.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt));
         assert(res.testedObject);
         assert.equal(res.headers.try, 'disposed');
-        assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=444","try":"disposed"}');
+        assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=22444","try":"disposed"}');
     });
 
     it('hit with cold cache via dispose', function() {
         const cache = new Cache({coldStorage});
         return cache.getCached('http://example.com/dispose', req, () => {
             return mockResponseWith({
-                'cache-control': 'public, max-age=444',
+                'cache-control': 'public, max-age=22444',
                 'try': 'disposed',
             });
         })
@@ -199,7 +199,7 @@ describe('Cold cache', function() {
         .then(res => {
             assert(res.testedObject);
             assert.equal(res.headers.try, 'disposed');
-            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=444","try":"disposed"}');
+            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=22444","try":"disposed"}');
         });
     });
 
