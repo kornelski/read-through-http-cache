@@ -169,24 +169,21 @@ describe('Cold cache', function() {
         });
     });
 
-    it('hit with cold cache via dump', function() {
+    it('hit with cold cache via dump', async function() {
         const cache = new Cache({coldStorage});
-        return cache.getCached('http://example.com/dispose', req, () => {
+        await cache.getCached('http://example.com/dispose', req, () => {
             return mockResponseWith({
                 'cache-control': 'public, max-age=444',
                 'try': 'disposed',
             });
-        })
-        .then(() => cache.dump())
-        .then(() => {
-            const cache2 = new Cache({coldStorage});
-            return cache2.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt));
-        })
-        .then(res => {
-            assert(res.testedObject);
-            assert.equal(res.headers.try, 'disposed');
-            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=444","try":"disposed"}');
         });
+        await cache.dump();
+
+        const cache2 = new Cache({coldStorage});
+        const res = await cache2.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt));
+        assert(res.testedObject);
+        assert.equal(res.headers.try, 'disposed');
+        assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=444","try":"disposed"}');
     });
 
     it('hit with cold cache via dispose', function() {
