@@ -2,6 +2,7 @@
 
 const assert = require('assert');
 const Cache = require('..');
+const CachePolicy = require('http-cache-semantics');
 
 const req = {
     headers: {},
@@ -9,6 +10,7 @@ const req = {
 
 function mockResponseWith(headers) {
     return {
+        status: 200,
         testedObject:true,
         body: new Buffer(0),
         headers,
@@ -157,49 +159,52 @@ describe('Cache', function() {
         assert.equal(res2.headers.second, 'yes');
     });
 
-    it('miss cookie', function() {
-        const cache = new Cache();
+    it('miss cookie', async function() {
+        let now = Date.now();
+        const cache = new Cache({CachePolicy: class Rewind extends CachePolicy {
+            now() {
+                return now;
+            }
+        }});
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called++;
             return mockResponseWith({
                 'set-cookie': 'foo=bar',
                 'cache-control': 'max-age=99',
             });
-        }).then(() => {
-            return cache.getCached('http://foo.bar/baz.quz', req, () => {
-                called++;
-                return mockResponseWith({
-                    'second': 'yes',
-                });
-            });
-        }).then(res => {
-            assert(res.testedObject);
-            assert.equal(2, called);
-            assert.equal(res.headers.second, 'yes');
         });
+        now += 15000;
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, () => {
+            called++;
+            return mockResponseWith({
+                'second': 'yes',
+            });
+        });
+        assert(res.testedObject);
+        assert.equal(2, called);
+        assert.equal(res.headers.second, 'yes');
     });
 
-    it('cache public cookie', function() {
+    it('cache public cookie', async function() {
         const cache = new Cache();
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called++;
             return mockResponseWith({
                 'set-cookie': 'foo=bar',
                 'cache-control': 'public, max-age=99',
             });
-        }).then(res => {
-            return cache.getCached('http://foo.bar/baz.quz', req, () => {
-                assert.fail("should cache")
-            });
-        }).then(res => {
-            assert(res.testedObject);
-            assert.equal(1, called);
-            assert.equal(res.headers['set-cookie'], 'foo=bar');
+        })
+
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, () => {
+            assert.fail("should cache")
         });
+        assert(res.testedObject);
+        assert.equal(1, called);
+        assert.equal(res.headers['set-cookie'], 'foo=bar');
     });
 
     it('miss max-age=0', function() {
