@@ -20,7 +20,7 @@ module.exports = class Cache {
                     });
                 }
             },
-            stale:false, // errors must expire
+            stale: true, // needed for revalidation
             maxAge: options.maxAge || 24*3600*1000,
         });
 
@@ -31,7 +31,13 @@ module.exports = class Cache {
     async getCached(url, request, onCacheMissCallback) {
         if (!url || !request || !onCacheMissCallback) throw Error("Bad cache args");
 
-        const cached = this._storage.get(url);
+        let cached = this._storage.get(url);
+
+        // Normal stale responses are allowed, but it'd be bad for timeouts and errors
+        if (cached && cached.expires && cached.expires < Date.now()) {
+            this._storage.del(url);
+            cached = undefined;
+        }
 
         if (cached) {
             if (cached.temp) {
@@ -55,11 +61,12 @@ module.exports = class Cache {
         .then(({res, policy, inColdStoarge}) => {
             if (policy && res && res.headers) {
                 res.headers = policy.responseHeaders(); // Headers must always be sanitized
-                const timeToLive = policy.timeToLive();
-                if (timeToLive) {
+                if (policy.storable()) {
+                    const timeToLive = policy.timeToLive();
                     res.headers['im2-cache'] = inColdStoarge ? 'cold' : 'miss';
                     const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
-                    this._storage.set(url, {cost, inColdStoarge, policy, promise:resultPromise}, timeToLive + Math.random()*2000); // Rand time to ease simultaneous cache misses
+                    const staleTime = timeToLive * 0.01 + 1000 + Math.random()*10000;
+                    this._storage.set(url, {cost, inColdStoarge, policy, promise:resultPromise}, timeToLive + staleTime);
                 } else {
                     this._storage.del(url);
                     res.headers['im2-cache'] = 'no-cache';
@@ -71,12 +78,12 @@ module.exports = class Cache {
             }
         }).catch(err => {
             // Self-referential awkwardness to avoid having a copy of the promise with uncaught error
-            this._storage.set(url, {cost: 30000, isError:true, promise:resultPromise}, this._errorTimeout);
+            this._storage.set(url, {cost: 30000, expires:Date.now() + this._errorTimeout, promise:resultPromise}, this._errorTimeout);
             throw err;
         });
 
         // thundering herd protection
-        this._storage.set(url, {cost:1, temp:true, promise:resultPromise}, this._busyTimeout);
+        this._storage.set(url, {cost:1, expires:Date.now() + this._busyTimeout, temp:true, promise:resultPromise}, this._busyTimeout);
         return resultPromise;
     }
 
