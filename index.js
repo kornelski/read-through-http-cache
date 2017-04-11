@@ -125,7 +125,7 @@ module.exports = class Cache {
             const ttl = cached.policy.timeToLive();
             if (ttl >= 3600*1000) { // don't bother if < 1h min time
                 cached.inColdStoarge = true;
-                this._coldStorage.set(url, res, ttl).catch(err => {
+                this._coldStorage.set(url, res, cached.policy).catch(err => {
                     console.error(err);
                     cached.inColdStoarge = false;
                 });
