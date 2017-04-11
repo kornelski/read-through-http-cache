@@ -39,118 +39,110 @@ describe('Cold cache', function() {
         }
     };
 
-    it('simple miss', function() {
+    it('simple miss', async function() {
         const cache = new Cache({storage:leakyBucket});
         let called = false;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             called = true;
             return mockResponseWith({});
-        }).then(res => {
-            assert(called);
-            assert(res);
-            assert(res.testedObject);
         });
+        assert(called);
+        assert(res);
+        assert(res.testedObject);
     });
 
 
-    it('miss without cache', function() {
+    it('miss without cache', async function() {
         const cache = new Cache({storage:leakyBucket});
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'cache-control': 'public, max-age=999999',
                 'old': 'yes',
             })
-        }).then(res => {
-            assert(res.testedObject);
-            return Promise.all([
-                cache.getCached('http://foo.bar/baz.quz', req, () => {
-                    called++;
-                    return mockResponseWith({
-                        old: 'no',
-                    });
-                }),
-                cache.getCached('https://foo.bar/baz.quz', req, () => {
-                    called++;
-                    return mockResponseWith({});
-                }),
-            ]);
-        }).then(tmp => {
-            assert(tmp[0].testedObject);
-            assert(tmp[1].testedObject);
-            assert.equal(tmp[0].headers.old, 'no');
-            assert.equal(2, called);
-        });
+        })
+        assert(res.testedObject);
+        const tmp = await Promise.all([
+            cache.getCached('http://foo.bar/baz.quz', req, () => {
+                called++;
+                return mockResponseWith({
+                    old: 'no',
+                });
+            }),
+            cache.getCached('https://foo.bar/baz.quz', req, () => {
+                called++;
+                return mockResponseWith({});
+            }),
+        ]);
+        assert(tmp[0].testedObject);
+        assert(tmp[1].testedObject);
+        assert.equal(tmp[0].headers.old, 'no');
+        assert.equal(2, called);
     });
 
-    it('miss without cache2', function() {
+    it('miss without cache2', async function() {
         const cache = new Cache();
         let called = 0;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'cache-control': 'public, max-age=999999',
                 'old': 'yes',
             })
-        }).then(res => {
-            cache.purge();
-            assert(res.testedObject);
-            return Promise.all([
-                cache.getCached('http://foo.bar/baz.quz', req, () => {
-                    called++;
-                    return mockResponseWith({
-                        old: 'no',
-                    });
-                }),
-                cache.getCached('https://foo.bar/baz.quz', req, () => {
-                    called++;
-                    return mockResponseWith({});
-                }),
-            ]);
-        }).then(tmp => {
-            assert(tmp[0].testedObject);
-            assert(tmp[1].testedObject);
-            assert.equal(tmp[0].headers.old, 'no');
-            assert.equal(2, called);
-        });
+        })
+        await cache.purge();
+        assert(res.testedObject);
+        const tmp = await Promise.all([
+            cache.getCached('http://foo.bar/baz.quz', req, () => {
+                called++;
+                return mockResponseWith({
+                    old: 'no',
+                });
+            }),
+            cache.getCached('https://foo.bar/baz.quz', req, () => {
+                called++;
+                return mockResponseWith({});
+            }),
+        ]);
+        assert(tmp[0].testedObject);
+        assert(tmp[1].testedObject);
+        assert.equal(tmp[0].headers.old, 'no');
+        assert.equal(2, called);
     });
 
-    it('hit with cold cache', function() {
+    it('hit with cold cache', async function() {
         const cache = new Cache({coldStorage});
         let missInParallelCalled = false;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'cache-control': 'public, max-age=999999',
                 'try': 'first',
             });
         })
-        .then(() => cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt)))
-        .then(res => {
-            cache.purge();
-            assert(res.testedObject);
-            return Promise.all([
-                cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt)),
-                cache.getCached('https://foo.bar/baz.quz', req, reqOpts => {
-                    assert(reqOpts);
-                    missInParallelCalled = true;
-                    return mockResponseWith({});
-                }),
-            ]);
-        }).then(tmp => {
-            assert(tmp[0].testedObject);
-            assert(tmp[1].testedObject);
-            assert.equal(tmp[0].headers.try, 'first');
-            assert.equal(tmp[0].body.toString(), 'bodyof{"cache-control":"public, max-age=999999","try":"first"}');
-            assert(missInParallelCalled);
-        });
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt));
+        await cache.purge();
+        assert(res.testedObject);
+        const tmp = await Promise.all([
+            cache.getCached('http://foo.bar/baz.quz', req, opt => assert.fail("should cache", opt)),
+            cache.getCached('https://foo.bar/baz.quz', req, reqOpts => {
+                assert(reqOpts);
+                missInParallelCalled = true;
+                return mockResponseWith({});
+            }),
+        ]);
+        assert(tmp[0].testedObject);
+        assert(tmp[1].testedObject);
+        assert.equal(tmp[0].headers.try, 'first');
+        assert.equal(tmp[0].body.toString(), 'bodyof{"cache-control":"public, max-age=999999","try":"first"}');
+        assert(missInParallelCalled);
     });
 
-    it('hit with new cache', function() {
+    it('hit with new cache', async function() {
         const cache1 = new Cache({coldStorage});
-        return Promise.all([
+        await Promise.all([
             cache1.getCached('http://test.local/long', req, () => {
                 return mockResponseWith({
                     'cache-control': 'public, max-age=6666',
@@ -158,15 +150,12 @@ describe('Cold cache', function() {
                 });
             }),
             cache1.getCached('http://test.local/long', req, opt => assert.fail("should cache", opt)),
-        ])
-        .then(() => {
-            const cache2 = new Cache({coldStorage});
-            return cache2.getCached('http://test.local/long', req, opt => assert.fail("should cache", opt));
-        }).then(res => {
-            assert(res.testedObject);
-            assert.equal(res.headers.cached, 'yeah');
-            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=6666","cached":"yeah"}');
-        });
+        ]);
+        const cache2 = new Cache({coldStorage});
+        const res = await cache2.getCached('http://test.local/long', req, opt => assert.fail("should cache", opt));
+        assert(res.testedObject);
+        assert.equal(res.headers.cached, 'yeah');
+        assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=6666","cached":"yeah"}');
     });
 
     it('hit with cold cache via dump', async function() {
@@ -186,57 +175,52 @@ describe('Cold cache', function() {
         assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=22444","try":"disposed"}');
     });
 
-    it('hit with cold cache via dispose', function() {
+    it('hit with cold cache via dispose', async function() {
         const cache = new Cache({coldStorage});
-        return cache.getCached('http://example.com/dispose', req, () => {
+        await cache.getCached('http://example.com/dispose', req, () => {
             return mockResponseWith({
                 'cache-control': 'public, max-age=22444',
                 'try': 'disposed',
             });
-        })
-        .then(() => cache.purge())
-        .then(() => cache.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt)))
-        .then(res => {
-            assert(res.testedObject);
-            assert.equal(res.headers.try, 'disposed');
-            assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=22444","try":"disposed"}');
         });
+        await cache.purge();
+        const res = await cache.getCached('http://example.com/dispose', req, opt => assert.fail("should cache", opt));
+        assert(res.testedObject);
+        assert.equal(res.headers.try, 'disposed');
+        assert.equal(res.body.toString(), 'bodyof{"cache-control":"public, max-age=22444","try":"disposed"}');
     });
 
-    it('miss with cold cache', function() {
+    it('miss with cold cache', async function() {
         const cache = new Cache({coldStorage});
         let missInParallelCalled = false;
-        return cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
+        await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
             assert(reqOpts);
             return mockResponseWith({
                 'cache-control': 'public, max-age=0',
                 'try': 'first',
             });
-        })
-        .then(() => cache.getCached('http://foo.bar/baz.quz', req, () => mockResponseWith({
+        });
+        const res = await cache.getCached('http://foo.bar/baz.quz', req, () => mockResponseWith({
             'cache-control': 'public, max-age=0',
             'try': 'second',
-        })))
-        .then(res => {
-            cache.purge();
-            assert(res.testedObject);
-            return Promise.all([
-                cache.getCached('http://foo.bar/baz.quz', req, () => mockResponseWith({
-                    'cache-control': 'public, max-age=10',
-                    'try': 'third',
-                })),
-                cache.getCached('https://foo.bar/baz.quz', req, reqOpts => {
-                    assert(reqOpts);
-                    missInParallelCalled = true;
-                    return mockResponseWith({});
-                }),
-            ]);
-        }).then(tmp => {
-            assert(tmp[0].testedObject);
-            assert(tmp[1].testedObject);
-            assert.equal(tmp[0].headers.try, 'third');
-            assert.equal(tmp[0].body.toString(), 'bodyof{"cache-control":"public, max-age=10","try":"third"}');
-            assert(missInParallelCalled);
-        });
+        }));
+        await cache.purge();
+        assert(res.testedObject);
+        const tmp = await Promise.all([
+            cache.getCached('http://foo.bar/baz.quz', req, () => mockResponseWith({
+                'cache-control': 'public, max-age=10',
+                'try': 'third',
+            })),
+            cache.getCached('https://foo.bar/baz.quz', req, reqOpts => {
+                assert(reqOpts);
+                missInParallelCalled = true;
+                return mockResponseWith({});
+            }),
+        ]);
+        assert(tmp[0].testedObject);
+        assert(tmp[1].testedObject);
+        assert.equal(tmp[0].headers.try, 'third');
+        assert.equal(tmp[0].body.toString(), 'bodyof{"cache-control":"public, max-age=10","try":"third"}');
+        assert(missInParallelCalled);
     });
 });
