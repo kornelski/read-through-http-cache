@@ -59,7 +59,7 @@ module.exports = class Cache {
 
         const resultPromise = this._getResult(url, request, cached, onCacheMissCallback)
         .then(({res, policy, inColdStoarge}) => {
-            if (policy && res && res.headers) {
+            if (policy && res && res.status) {
                 res.headers = policy.responseHeaders(); // Headers must always be sanitized
                 if (policy.storable()) {
                     const timeToLive = policy.timeToLive();
@@ -74,6 +74,7 @@ module.exports = class Cache {
                 return res;
             } else {
                 this._storage.del(url);
+                console.error("empty res", res, policy);
                 throw Error(`Empty result: ${url}`);
             }
         }).catch(err => {
@@ -89,11 +90,21 @@ module.exports = class Cache {
 
     async _getResult(url, request, cached, onCacheMissCallback) {
         if (this._coldStorage) {
-            const res = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
-            if (res) {
-                // FIXME: it should read cachePolicy as well!
-                const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
-                return {res, policy, inColdStoarge: true};
+            const cold = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
+            if (cold && cold.policy) {
+                if (cold.policy.satisfiesWithoutRevalidation(request)) {
+                    return {res: cold.response, policy: cold.policy, inColdStoarge: true};
+                }
+                const headers = cold.policy.revalidationHeaders(request);
+                let res = await onCacheMissCallback(headers);
+
+                const {policy, modified} = cold.policy.revalidatedPolicy({headers}, res);
+                if (!modified) {
+                    res = cold.response;
+                } else if (res.status === 304) {
+                    res = await onCacheMissCallback({});
+                }
+                return {res, policy};
             }
         }
 
