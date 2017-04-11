@@ -90,11 +90,9 @@ module.exports = class Cache {
 
     async _getResult(url, request, cached, onCacheMissCallback) {
         if (this._coldStorage) {
-            const res = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
-            if (res) {
-                // FIXME: it should read cachePolicy as well!
-                const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});
-                return {res, policy, inColdStoarge: true};
+            const tmp = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
+            if (tmp) {
+                return {res: tmp.response, policy: tmp.policy, inColdStoarge: true};
             }
         }
 
@@ -121,12 +119,12 @@ module.exports = class Cache {
         return {res, policy};
     }
 
-    _putInColdStorage(url, res, cached) {
+    _putInColdStorage(url, response, cached) {
         if (!cached.inColdStoarge && this._coldStorage) {
             const ttl = cached.policy.timeToLive();
             if (ttl >= 3600*1000) { // don't bother if < 1h min time
                 cached.inColdStoarge = true;
-                this._coldStorage.set(url, res, ttl).catch(err => {
+                this._coldStorage.set(url, {response, policy:cached.policy}).catch(err => {
                     console.error(err);
                     cached.inColdStoarge = false;
                 });

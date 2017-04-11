@@ -113,7 +113,7 @@ describe('Cold cache', function() {
         assert.equal(2, called);
     });
 
-    it('hit with cold cache', async function() {
+    it('hit with cold cache basic', async function() {
         const cache = new Cache({coldStorage});
         let missInParallelCalled = false;
         await cache.getCached('http://foo.bar/baz.quz', req, reqOpts => {
