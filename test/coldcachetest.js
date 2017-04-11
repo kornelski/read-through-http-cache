@@ -9,6 +9,7 @@ const req = {
 
 function mockResponseWith(headers) {
     return {
+        status: 200,
         testedObject:true,
         body: new Buffer(`bodyof${JSON.stringify(headers)}`),
         headers,

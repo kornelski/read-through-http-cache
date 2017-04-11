@@ -59,7 +59,7 @@ module.exports = class Cache {
 
         const resultPromise = this._getResult(url, request, cached, onCacheMissCallback)
         .then(({res, policy, inColdStoarge}) => {
-            if (policy && res && res.headers) {
+            if (policy && res && res.status) {
                 res.headers = policy.responseHeaders(); // Headers must always be sanitized
                 if (policy.storable()) {
                     const timeToLive = policy.timeToLive();
@@ -74,6 +74,7 @@ module.exports = class Cache {
                 return res;
             } else {
                 this._storage.del(url);
+                console.error("empty res", res, policy);
                 throw Error(`Empty result: ${url}`);
             }
         }).catch(err => {
