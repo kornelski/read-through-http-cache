@@ -90,9 +90,21 @@ module.exports = class Cache {
 
     async _getResult(url, request, cached, onCacheMissCallback) {
         if (this._coldStorage) {
-            const tmp = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
-            if (tmp) {
-                return {res: tmp.response, policy: tmp.policy, inColdStoarge: true};
+            const cold = await this._coldStorage.get(url).catch(err => {console.error("Ignored cold storage", err);});
+            if (cold && cold.policy) {
+                if (cold.policy.satisfiesWithoutRevalidation(request)) {
+                    return {res: cold.response, policy: cold.policy, inColdStoarge: true};
+                }
+                const headers = cold.policy.revalidationHeaders(request);
+                let res = await onCacheMissCallback(headers);
+
+                const {policy, modified} = cold.policy.revalidatedPolicy({headers}, res);
+                if (!modified) {
+                    res = cold.response;
+                } else if (res.status === 304) {
+                    res = await onCacheMissCallback({});
+                }
+                return {res, policy};
             }
         }
 
