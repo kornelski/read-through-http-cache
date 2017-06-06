@@ -50,7 +50,7 @@ module.exports = class Cache {
                     this._putInColdStorage(url, res, cached);
 
                     res.headers = cached.policy.responseHeaders();
-                    res.headers['im2-cache'] = 'hit';
+                    res.headers['server-timing'] = 'hit';
                     res.ttl = cached.policy.timeToLive();
                 }
                 return res;
@@ -63,13 +63,13 @@ module.exports = class Cache {
                 res.headers = policy.responseHeaders(); // Headers must always be sanitized
                 if (policy.storable()) {
                     const timeToLive = policy.timeToLive();
-                    res.headers['im2-cache'] = inColdStoarge ? 'cold' : 'miss';
+                    res.headers['server-timing'] = inColdStoarge ? 'cold' : 'miss';
                     const cost = 4000 + (Buffer.isBuffer(res.body) ? res.body.byteLength : 8000);
                     const staleTime = timeToLive * 0.01 + 1000 + Math.random()*10000;
                     this._storage.set(url, {cost, inColdStoarge, policy, promise:resultPromise}, timeToLive + staleTime);
                 } else {
                     this._storage.del(url);
-                    res.headers['im2-cache'] = 'no-cache';
+                    res.headers['server-timing'] = 'nocache';
                 }
                 return res;
             } else {
