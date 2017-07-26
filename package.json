@@ -10,10 +10,10 @@
   "author": "Kornel Lesiński <kornel@geekhood.net> (https://kornel.ski/)",
   "license": "BSD-2-Clause",
   "devDependencies": {
-    "mocha": "^3.2.0"
+    "mocha": "^3.4.2"
   },
   "dependencies": {
-    "http-cache-semantics": "^3.6.1",
-    "lru-cache": "^4.0.1"
+    "http-cache-semantics": "^3.7.3",
+    "lru-cache": "^4.1.0"
   }
 }
