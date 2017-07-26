@@ -78,6 +78,32 @@ describe('Revalidate', function() {
         assert.equal('origbody', res.body);
     });
 
+    it('concurrent revalidation and non-revalidation', async function() {
+        const cache = new Cache();
+
+        const noRevalReq = Object.assign({}, req, {'if-modified-since':undefined});
+        const req1Promise = cache.getCached('http://foo.bar/baz.quz', req, revalHeaders => {
+            return mockResponseWith({"cache-control":'no-cache'}, 200, "req1");
+        });
+        req1Promise.catch(() => 'shut up node');
+
+        const req2Promise = cache.getCached('http://foo.bar/baz.quz', req, revalHeaders => {
+            assert(revalHeaders['if-modified-since']);
+            return mockResponseWith(revalHeaders, 304, "req2");
+        });
+        req2Promise.catch(() => 'shut up node');
+
+        const req3 = await cache.getCached('http://foo.bar/baz.quz', noRevalReq, revalHeaders => {
+            assert(revalHeaders['if-modified-since']);
+            return mockResponseWith(revalHeaders, 304, "req3");
+        });
+        const req1 = await req1Promise;
+        const req2 = await req2Promise;
+        assert.equal("req1",req1.body)
+        assert.equal("req1",req2.body)
+        assert.equal("req1",req3.body)
+    });
+
     it('check with last-modified', async function() {
         let now = Date.now();
         const cache = new Cache({CachePolicy: class MyCachePolicy extends CachePolicy {now(){return now}}});
