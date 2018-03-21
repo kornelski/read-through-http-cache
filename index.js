@@ -125,9 +125,12 @@ module.exports = class Cache {
         let res = await onCacheMissCallback({});
         if (res.status === 304) {
             console.error("Unexpected revalidation", res.headers, request);
-            res = await onCacheMissCallback({"cache-control":"no-cache"});
+            await new Promise(r => setTimeout(r, 50));
+            res = await onCacheMissCallback({"cache-control":"no-cache,must-revalidate"});
             if (res.status === 304) {
-                throw Error("Unexpected revalidation, twice");
+                const err = Error("Unexpected revalidation, twice");
+                err.extra = {request, headers:res.headers}
+                throw err;
             }
         }
         const policy = new this._CachePolicy(request, res, {shared:true, ignoreCargoCult:true});

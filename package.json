@@ -3,7 +3,7 @@
   "version": "4.0.2",
   "description": "Read-through LRU cache that has basic understanding of HTTP cache headers",
   "main": "index.js",
-  "repository": "https://github.com/pornel/read-through-http-cache.git",
+  "repository": "https://github.com/kornelski/read-through-http-cache.git",
   "scripts": {
     "test": "mocha"
   },
