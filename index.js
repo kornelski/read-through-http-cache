@@ -46,14 +46,18 @@ module.exports = class Cache {
             }
             if (!cached.policy || cached.policy.satisfiesWithoutRevalidation(request)) {
                 const res = await cached.promise;
-                if (cached.policy) {
-                    this._putInColdStorage(url, res, cached);
+                if (!res || res.status == 304) {
+                    console.error("Bogus store 2", res);
+                } else {
+                    if (cached.policy) {
+                        this._putInColdStorage(url, res, cached);
 
-                    res.headers = cached.policy.responseHeaders();
-                    res.headers['server-timing'] = 'hit';
-                    res.ttl = cached.policy.timeToLive();
+                        res.headers = cached.policy.responseHeaders();
+                        res.headers['server-timing'] = 'hit';
+                        res.ttl = cached.policy.timeToLive();
+                    }
+                    return res;
                 }
-                return res;
             }
         }
 
@@ -139,6 +143,10 @@ module.exports = class Cache {
     }
 
     _putInColdStorage(url, response, cached) {
+        if (response.status == 304) {
+            console.error("Bogus store 1", response);
+            return;
+        }
         if (!cached.inColdStoarge && this._coldStorage) {
             const ttl = cached.policy.timeToLive();
             if (ttl >= 3600*1000) { // don't bother if < 1h min time
